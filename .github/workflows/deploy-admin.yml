@@ -1,0 +1,69 @@
+name: Build and deploy admin frontend to Azure Web App
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          # Add this secret in GitHub → repo Settings → Secrets → Actions:
+          #   Name:   VITE_API_URL
+          #   Value:  https://<your-backend-app>.azurewebsites.net
+          # Vite bakes this in at build time — it cannot be changed at runtime.
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-dist
+          # Deploy only the compiled output — NOT node_modules or source files.
+          path: dist
+
+  deploy:
+    runs-on: windows-latest
+    needs: build
+
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: admin-dist
+          path: dist
+
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          # These secrets are created automatically by Azure Deployment Center.
+          # If setting up manually: Azure Portal → App Service → Deployment Center
+          # → GitHub Actions → Authorize → pick this repo.
+          client-id:       ${{ secrets.AZUREAPPSERVICE_CLIENTID }}
+          tenant-id:       ${{ secrets.AZUREAPPSERVICE_TENANTID }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID }}
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          # Change this to your actual admin Web App name in Azure.
+          app-name:  '<your-admin-app-name>'
+          slot-name: 'Production'
+          # This deploys the dist/ folder — the compiled static files only.
+          package:   dist
