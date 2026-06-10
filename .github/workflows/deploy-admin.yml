@@ -66,7 +66,7 @@ jobs:
         uses: azure/webapps-deploy@v3
         with:
           # Change this to your actual admin Web App name in Azure.
-          app-name:  '<your-admin-app-name>'
+          app-name:  'scuba-admin'
           slot-name: 'Production'
           # This deploys the dist/ folder — the compiled static files only.
           package:   dist
