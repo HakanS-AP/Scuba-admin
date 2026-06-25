@@ -20,20 +20,17 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: admin-frontend/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        working-directory: admin-frontend
         run: npm ci
 
       - name: Build
-        working-directory: admin-frontend
         run: npm run build
         env:
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
 
       - name: Bundle server into dist
-        working-directory: admin-frontend
         run: |
           cp server.js dist/server.js
           cat > dist/package.json << 'EOF'
@@ -53,7 +50,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: node-app
-          path: admin-frontend/dist
+          path: dist
 
   deploy:
     runs-on: ubuntu-latest
