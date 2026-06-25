@@ -1,4 +1,4 @@
-const BASE_URL = import.meta.env.VITE_API_URL || ''
+const BASE_URL = window.__ENV__?.API_URL || import.meta.env.VITE_API_URL || ''
 
 // All admin requests use credentials: 'include' so the browser automatically
 // attaches the HttpOnly session cookie. The cookie is set by the server and is
