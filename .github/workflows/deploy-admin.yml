@@ -1,4 +1,4 @@
-name: Build and deploy admin frontend to Azure Web App
+name: Build and deploy admin frontend to Azure Web App - scuba-admin
 
 on:
   push:
@@ -7,8 +7,10 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-and-deploy:
-    runs-on: windows-latest
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - uses: actions/checkout@v4
@@ -30,11 +32,8 @@ jobs:
         env:
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
 
-      # Copy the static file server into dist/ so Oryx has a valid Node.js app
-      # to start. Without this, Oryx cannot detect a Node.js version and fails.
       - name: Bundle server into dist
         working-directory: admin-frontend
-        shell: bash
         run: |
           cp server.js dist/server.js
           cat > dist/package.json << 'EOF'
@@ -50,14 +49,35 @@ jobs:
           }
           EOF
 
+      - name: Upload artifact for deployment job
+        uses: actions/upload-artifact@v4
+        with:
+          name: node-app
+          path: admin-frontend/dist
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Download artifact from build job
+        uses: actions/download-artifact@v4
+        with:
+          name: node-app
+
       - name: Login to Azure
         uses: azure/login@v2
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_8EEBB2CA98E94A96B159686101EE04C2 }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_37C2EF9D80564DEA92A1C735BD443858 }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_E59FC1B33D5049F4A609643E7ADF3A8E }}
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
           app-name: 'scuba-admin'
           slot-name: 'Production'
-          package: admin-frontend/dist
+          package: .
