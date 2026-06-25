@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: windows-latest
 
     steps:
@@ -18,55 +18,46 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
+          cache-dependency-path: admin-frontend/package-lock.json
 
       - name: Install dependencies
+        working-directory: admin-frontend
         run: npm ci
 
       - name: Build
+        working-directory: admin-frontend
         run: npm run build
         env:
-          # Add this secret in GitHub → repo Settings → Secrets → Actions:
-          #   Name:   VITE_API_URL
-          #   Value:  https://<your-backend-app>.azurewebsites.net
-          # Vite bakes this in at build time — it cannot be changed at runtime.
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
 
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: admin-dist
-          # Deploy only the compiled output — NOT node_modules or source files.
-          path: dist
-
-  deploy:
-    runs-on: windows-latest
-    needs: build
-    permissions:
-      id-token: write  # Required for azure/login OIDC authentication
-      contents: read
-
-    steps:
-      - name: Download build artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: admin-dist
-          path: dist
+      # Copy the static file server into dist/ so Oryx has a valid Node.js app
+      # to start. Without this, Oryx cannot detect a Node.js version and fails.
+      - name: Bundle server into dist
+        working-directory: admin-frontend
+        shell: bash
+        run: |
+          cp server.js dist/server.js
+          cat > dist/package.json << 'EOF'
+          {
+            "name": "admin-frontend",
+            "version": "1.0.0",
+            "scripts": {
+              "start": "node server.js"
+            },
+            "dependencies": {
+              "express": "^4.19.0"
+            }
+          }
+          EOF
 
       - name: Login to Azure
         uses: azure/login@v2
         with:
-          # These secrets are created automatically by Azure Deployment Center.
-          # If setting up manually: Azure Portal → App Service → Deployment Center
-          # → GitHub Actions → Authorize → pick this repo.
-          client-id:       ${{ secrets.AZUREAPPSERVICE_CLIENTID }}
-          tenant-id:       ${{ secrets.AZUREAPPSERVICE_TENANTID }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID }}
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
-          # Change this to your actual admin Web App name in Azure.
-          app-name:  '<your-admin-app-name>'
+          app-name: 'scuba-admin'
           slot-name: 'Production'
-          # This deploys the dist/ folder — the compiled static files only.
-          package:   dist
+          package: admin-frontend/dist
