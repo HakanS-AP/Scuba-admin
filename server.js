@@ -5,7 +5,10 @@ const fs      = require('fs')
 const app  = express()
 const port = process.env.PORT || 8080
 
-app.use(express.static(__dirname))
+// index:false so a request for "/" is NOT auto-served as raw index.html —
+// otherwise express.static short-circuits "/" before the injection handler
+// below runs, and the SPA loads with an empty window.__ENV__ (empty API_URL).
+app.use(express.static(__dirname, { index: false }))
 
 // Inject runtime config into index.html so the SPA can read it from
 // window.__ENV__ without needing a rebuild when the API URL changes.
